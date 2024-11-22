@@ -156,7 +156,6 @@ fn march(ro: vec3f, rd: vec3f) -> march_output
       // raymarch algorithm
       let p = ro + rd*depth;
       // call scene function and march
-      depth += march_step;
       let res = scene(p);
       let distance = res.w;
       color = res.xyz;
@@ -164,9 +163,11 @@ fn march(ro: vec3f, rd: vec3f) -> march_output
       // if the depth is greater than the max distance or the distance is less than the epsilon, break
       if (depth > MAX_DIST || distance < EPSILON)
       {
-        return march_output(color, depth, false);
+        return march_output(color,depth,false);
       }
+      depth += march_step;
   }
+  return march_output(vec3f(0.0), MAX_DIST, false);
   
 }
 
@@ -263,7 +264,7 @@ fn preprocess(@builtin(global_invocation_id) id : vec3u)
   {
     return;
   }
-
+  return;
   // optional: performance boost
   // Do all the transformations here and store them in the buffer since this is called only once per object and not per pixel
 }
@@ -288,9 +289,12 @@ fn render(@builtin(global_invocation_id) id : vec3u)
   var rd = camera * normalize(vec3(uv, 1.0));
 
   // call march function and get the color/depth
-
+  let m_out = march(ro,rd);
+  let m_color = m_out.color;
+  let depth= m_out.depth;
 
   // move ray based on the depth
+  var p = ro + rd*depth;
   // get light
   var color = vec3f(1.0);
   
