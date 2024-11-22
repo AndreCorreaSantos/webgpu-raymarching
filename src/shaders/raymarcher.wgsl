@@ -99,9 +99,34 @@ fn scene(p: vec3f) -> vec4f // xyz = color, w = distance
     for (var i = 0; i < all_objects_count; i = i + 1)
     {
       // get shape and shape order (shapesinfo)
+      var info_ = shapesinfob[i];
+      let index_ = i32(info_.y);
+      let stype_ = info_.x; 
+      var shape_ = shapesb[index_];
       // shapesinfo has the following format:
       // x: shape type (0: sphere, 1: box, 2: torus)
       // y: shape index
+      let quat_ = quaternion_from_euler(shape_.rotation.xyz);
+      if ( stype_ > 1.0) // torus
+      { 
+        d = sdf_torus(p,shape_.radius.xy,quat_); 
+      }
+      else if (stype_ > 0.0)// box
+      {
+        d = sdf_round_box(p,vec3f(0.0),shape_.radius.x,quat_); 
+      } 
+      else  // sphere
+      {
+        d = sdf_sphere(p,shape_.radius,quat_);
+      }
+      
+      if (d < result.w) // if closest object 
+      {
+        result.w = d; // assign closest distance
+      }
+      let res = vec4f(shape_.color.xyz,d);
+      result = res; // assign color and distance 
+      
       // order matters for the operations, they're sorted on the CPU side
 
       // call transform_p and the sdf for the shape
@@ -113,7 +138,6 @@ fn scene(p: vec3f) -> vec4f // xyz = color, w = distance
       // z: repeat mode (0: normal, 1: repeat)
       // w: repeat offset
     }
-
     return result;
 }
 
@@ -124,16 +148,26 @@ fn march(ro: vec3f, rd: vec3f) -> march_output
 
   var depth = 0.0;
   var color = vec3f(0.0);
+  var distance = 10000;
   var march_step = uniforms[22];
   
   for (var i = 0; i < max_marching_steps; i = i + 1)
   {
       // raymarch algorithm
+      let p = ro + rd*depth;
       // call scene function and march
+      depth += march_step;
+      let res = scene(p);
+      let distance = res.w;
+      color = res.xyz;
+      // how to determine color
       // if the depth is greater than the max distance or the distance is less than the epsilon, break
+      if (depth > MAX_DIST || distance < EPSILON)
+      {
+        return march_output(color, depth, false);
+      }
   }
-
-  return march_output(color, depth, false);
+  
 }
 
 fn get_normal(p: vec3f) -> vec3f
@@ -254,6 +288,8 @@ fn render(@builtin(global_invocation_id) id : vec3u)
   var rd = camera * normalize(vec3(uv, 1.0));
 
   // call march function and get the color/depth
+
+
   // move ray based on the depth
   // get light
   var color = vec3f(1.0);

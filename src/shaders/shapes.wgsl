@@ -1,16 +1,17 @@
-fn sdf_round_box(p: vec3f, b: vec3f, r: f32, quat: vec4f) -> f32
-{
-  return 0.01;
+fn sdf_round_box(p: vec3<f32>, b: vec3<f32>, r: f32,quat: vec4f) -> f32 {
+    let q = abs(p) - b + vec3<f32>(r, r, r);
+    return length(max(q, vec3<f32>(0.0, 0.0, 0.0))) + min(max(q.x, max(q.y, q.z)), 0.0) - r;
 }
 
 fn sdf_sphere(p: vec3f, r: vec4f, quat: vec4f) -> f32
 {
-  return 0.01;
+  return length(p)-r.x;
 }
 
 fn sdf_torus(p: vec3f, r: vec2f, quat: vec4f) -> f32
 {
-  return 0.01;
+  let q = vec2f(length(p.xz)-r.x,p.y);
+  return length(q)-r.y;
 }
 
 fn sdf_mandelbulb(p: vec3f) -> vec2f
