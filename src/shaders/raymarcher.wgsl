@@ -296,7 +296,8 @@ fn render(@builtin(global_invocation_id) id : vec3u)
   // move ray based on the depth
   var p = ro + rd*depth;
   // get light
-  var color = vec3f(1.0);
+  // var color = vec3f(1.0);
+  var color = m_color;
   
   // display the result
   color = linear_to_gamma(color);
