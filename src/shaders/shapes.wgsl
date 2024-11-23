@@ -8,11 +8,17 @@ fn sdf_sphere(p: vec3f, r: vec4f, quat: vec4f) -> f32
   return length(p)-r.x;
 }
 
-fn sdf_torus(p: vec3f, r: vec2f, quat: vec4f) -> f32
+fn sdf_torus(p: vec3f, t: vec2f, quat: vec4f) -> f32
 {
-  let q = vec2f(length(p.xz)-r.x,p.y);
-  return length(q)-r.y;
+  let q = vec2f(length(p.xz)-t.x,p.y);
+  return length(q)-t.y;
 }
+
+// float sdTorus( vec3 p, vec2 t )
+// {
+//   vec2 q = vec2(length(p.xz)-t.x,p.y);
+//   return length(q)-t.y;
+// }
 
 fn sdf_mandelbulb(p: vec3f) -> vec2f
 {

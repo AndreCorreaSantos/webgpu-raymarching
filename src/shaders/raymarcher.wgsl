@@ -107,6 +107,8 @@ fn scene(p: vec3f) -> vec4f // xyz = color, w = distance
       // x: shape type (0: sphere, 1: box, 2: torus)
       // y: shape index
       let quat_ = quaternion_from_euler(shape_.rotation.xyz);
+      let p = p+shape_.transform.xyz;
+
       if ( stype_ > 1.0) // torus
       { 
         d = sdf_torus(p,shape_.radius.xy,quat_); 
@@ -123,9 +125,10 @@ fn scene(p: vec3f) -> vec4f // xyz = color, w = distance
       if (d < result.w) // if closest object 
       {
         result.w = d; // assign closest distance
+        let res = vec4f(shape_.color.xyz,d);
+        result = res; // assign color and distance 
       }
-      let res = vec4f(shape_.color.xyz,d);
-      result = res; // assign color and distance 
+
       
       // order matters for the operations, they're sorted on the CPU side
 
@@ -154,7 +157,7 @@ fn march(ro: vec3f, rd: vec3f) -> march_output
   for (var i = 0; i < max_marching_steps; i = i + 1)
   {
       // raymarch algorithm
-      let p = ro + rd*depth;
+      let p = ro+rd*depth;
       // call scene function and march
       let res = scene(p);
       let distance = res.w;
@@ -165,7 +168,7 @@ fn march(ro: vec3f, rd: vec3f) -> march_output
       {
         return march_output(color,depth,false);
       }
-      depth += march_step;
+      depth += distance;
   }
   return march_output(vec3f(0.0), MAX_DIST, false);
   
