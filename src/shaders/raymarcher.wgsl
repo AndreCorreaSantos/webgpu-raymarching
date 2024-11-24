@@ -115,7 +115,7 @@ fn scene(p: vec3f) -> vec4f // xyz = color, w = distance
       }
       else if (stype_ > 0.0)// box
       {
-        d = sdf_round_box(p,vec3f(0.0),shape_.radius.x,quat_); 
+        d = sdf_round_box(p, shape_.radius.xyz, shape_.radius.w, quat_);
       } 
       else  // sphere
       {
@@ -259,13 +259,6 @@ fn get_light(current: vec3f, obj_color: vec3f, rd: vec3f) -> vec3f
 
     // Compute the normal at the current point
     var normal = get_normal(current);
-
-    // Optional: Early exit if the point is too far from the light source
-    var max_light_distance = uniforms[20] + uniforms[8];
-    if (length(current - light_position) > max_light_distance)
-    {
-        return ambient_light * obj_color;
-    }
 
     // Compute the direction to the light source
     var light_dir = normalize(light_position - current);
