@@ -115,20 +115,20 @@ fn scene(p: vec3f) -> vec4f // xyz = color, w = distance
       // shapesinfo has the following format:
       // x: shape type (0: sphere, 1: box, 2: torus)
       // y: shape index
-      let quat_ = quaternion_from_euler(shape_.rotation.xyz);
-      let p = p - shape_.transform.xyz;
+      let quat_ =  shape_.quat;
+      let p_local =  p - shape_.transform_animated.xyz;
 
       if ( stype_ > 1.0) // torus
       { 
-        d = sdf_torus(p,shape_.radius.xy,quat_); 
+        d = sdf_torus(p_local,shape_.radius.xy,quat_); 
       }
       else if (stype_ > 0.0)// box
       {
-        d = sdf_round_box(p, shape_.radius.xyz, shape_.radius.w, quat_);
+        d = sdf_round_box(p_local, shape_.radius.xyz, shape_.radius.w, quat_);
       } 
       else  // sphere
       {
-        d = sdf_sphere(p,shape_.radius,quat_);
+        d = sdf_sphere(p_local,shape_.radius,quat_);
       }
 
       let op_type = shape_.op.x;
@@ -150,11 +150,7 @@ fn scene(p: vec3f) -> vec4f // xyz = color, w = distance
         result = res; // assign color and distance 
       }
 
-      
-      // order matters for the operations, they're sorted on the CPU side
 
-      // call transform_p and the sdf for the shape
-      // call op function with the shape operation
 
     }
 
@@ -333,21 +329,37 @@ fn animate(val: vec3f, amplitude: vec3f, speed: f32, time: f32) -> vec3f {
 }
 
 @compute @workgroup_size(THREAD_COUNT, 1, 1)
-fn preprocess(@builtin(global_invocation_id) id : vec3u)
-{
+fn preprocess(@builtin(global_invocation_id) id : vec3u) {
   var time = uniforms[0];
   var spheresCount = i32(uniforms[2]);
   var boxesCount = i32(uniforms[3]);
   var torusCount = i32(uniforms[4]);
   var all_objects_count = spheresCount + boxesCount + torusCount;
 
-  if (id.x >= u32(all_objects_count))
-  {
+  if (i32(id.x) >= all_objects_count) {
     return;
   }
-  return;
-  // optional: performance boost
-  // Do all the transformations here and store them in the buffer since this is called only once per object and not per pixel
+
+  let idx = i32(id.x);
+  var shape = shapesb[idx];
+
+  // Animate position
+  var animated_position = animate(
+      shape.transform.xyz,
+      shape.animate_transform.xyz,
+      shape.animate_transform.w,
+      time
+  );
+  shapesb[idx].transform_animated = vec4f(animated_position, shape.transform.w);
+
+  // Animate rotation
+  var animated_rotation = animate(
+      shape.rotation.xyz,
+      shape.animate_rotation.xyz,
+      shape.animate_rotation.w,
+      time
+  );
+  shapesb[idx].quat = quaternion_from_euler(animated_rotation);
 }
 
 @compute @workgroup_size(THREAD_COUNT, THREAD_COUNT, 1)
