@@ -1,16 +1,19 @@
 fn sdf_round_box(p: vec3<f32>, b: vec3<f32>, r: f32,quat: vec4f) -> f32 {
-    let q = abs(p) - b + vec3<f32>(r, r, r);
+    let p_ = rotate_vector(p,quat);
+    let q = abs(p_) - b + vec3<f32>(r, r, r);
     return length(max(q, vec3<f32>(0.0, 0.0, 0.0))) + min(max(q.x, max(q.y, q.z)), 0.0) - r;
 }
 
 fn sdf_sphere(p: vec3f, r: vec4f, quat: vec4f) -> f32
 {
-  return length(p)-r.x;
+  let p_ = rotate_vector(p,quat);
+  return length(p_)-r.w;
 }
 
 fn sdf_torus(p: vec3f, t: vec2f, quat: vec4f) -> f32
 {
-  let q = vec2f(length(p.xz)-t.x,p.y);
+  let p_ = rotate_vector(p,quat);
+  let q = vec2f(length(p_.xz)-t.x,p_.y);
   return length(q)-t.y;
 }
 

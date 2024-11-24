@@ -34,20 +34,26 @@ struct march_output {
 
 fn op_smooth_union(d1: f32, d2: f32, col1: vec3f, col2: vec3f, k: f32) -> vec4f
 {
-  var k_eps = max(k, 0.0001);
-  return vec4f(col1, d1);
+    var h = clamp(0.5 + 0.5 * (d2 - d1) / k, 0.0, 1.0);
+    var d = mix(d2, d1, h) - k * h * (1.0 - h);
+    var col = mix(col2, col1, h);
+    return vec4f(col, d);
 }
 
 fn op_smooth_subtraction(d1: f32, d2: f32, col1: vec3f, col2: vec3f, k: f32) -> vec4f
 {
-  var k_eps = max(k, 0.0001);
-  return vec4f(col1, d1);
+    var h = clamp(0.5 - 0.5 * (d2 + d1) / k, 0.0, 1.0);
+    var d = mix(d2, -d1, h) + k * h * (1.0 - h);
+    var col = mix(col2, col1, h);
+    return vec4f(col, d);
 }
 
 fn op_smooth_intersection(d1: f32, d2: f32, col1: vec3f, col2: vec3f, k: f32) -> vec4f
 {
-  var k_eps = max(k, 0.0001);
-  return vec4f(col1, d1);
+    var h = clamp(0.5 - 0.5 * (d2 - d1) / k, 0.0, 1.0);
+    var d = mix(d2, d1, h) + k * h * (1.0 - h);
+    var col = mix(col2, col1, h);
+    return vec4f(col, d);
 }
 
 fn op(op: f32, d1: f32, d2: f32, col1: vec3f, col2: vec3f, k: f32) -> vec4f
@@ -137,6 +143,11 @@ fn scene(p: vec3f) -> vec4f // xyz = color, w = distance
 
       // op format:
       // x: operation (0: union, 1: subtraction, 2: intersection)
+      var op_type = shape_.op.x;
+      var op_k = shape_.op.y;
+      var rep = shape_.op.z;
+      var rep_offset = shape_.op.w;
+
       // y: k value
       // z: repeat mode (0: normal, 1: repeat)
       // w: repeat offset
@@ -267,13 +278,6 @@ fn get_light(current: vec3f, obj_color: vec3f, rd: vec3f) -> vec3f
     var diff_intensity = max(dot(normal, light_dir), 0.0);
     var diffuse = diff_intensity * obj_color * sun_color;
 
-    // Compute specular shading (Phong reflection model)
-    var view_dir = normalize(-rd); // Direction from the point to the camera
-    var reflect_dir = reflect(-light_dir, normal);
-    var shininess = 32.0; // Adjust shininess as needed
-    var spec_intensity = pow(max(dot(view_dir, reflect_dir), 0.0), shininess);
-    var specular = spec_intensity * sun_color;
-
     // Compute shadow factor using soft shadows
     var shadow = get_soft_shadow(
         current + normal * eps, // Offset to prevent self-shadowing
@@ -285,7 +289,6 @@ fn get_light(current: vec3f, obj_color: vec3f, rd: vec3f) -> vec3f
 
     // Apply shadow to diffuse and specular components
     diffuse *= shadow;
-    specular *= shadow;
 
     // Optional: Compute ambient occlusion
     var ao = get_AO(current, normal);
@@ -293,7 +296,6 @@ fn get_light(current: vec3f, obj_color: vec3f, rd: vec3f) -> vec3f
     // Combine all components
     var color = ambient_light * obj_color; // Ambient component
     color += diffuse;                      // Add diffuse component
-    color += specular;                     // Add specular component
     color *= ao;                           // Apply ambient occlusion
     color = clamp(color, vec3f(0.0), vec3f(1.0)); // Clamp color to valid range
 
@@ -310,9 +312,8 @@ fn set_camera(ro: vec3f, ta: vec3f, cr: f32) -> mat3x3<f32>
   return mat3x3<f32>(cu, cv, cw);
 }
 
-fn animate(val: vec3f, time_scale: f32, offset: f32) -> vec3f
-{
-  return vec3f(0.0);
+fn animate(val: vec3f, amplitude: vec3f, speed: f32, time: f32) -> vec3f {
+    return val + amplitude * sin(speed * time);
 }
 
 @compute @workgroup_size(THREAD_COUNT, 1, 1)
@@ -334,36 +335,44 @@ fn preprocess(@builtin(global_invocation_id) id : vec3u)
 }
 
 @compute @workgroup_size(THREAD_COUNT, THREAD_COUNT, 1)
-fn render(@builtin(global_invocation_id) id : vec3u)
+fn render(@builtin(global_invocation_id) id: vec3u)
 {
-  // unpack data
-  var fragCoord = vec2f(f32(id.x), f32(id.y));
-  var rez = vec2(uniforms[1]);
-  var time = uniforms[0];
+    // Unpack data
+    var fragCoord = vec2f(f32(id.x), f32(id.y));
+    var rez = vec2f(uniforms[1]);
+    var time = uniforms[0];
 
-  // camera setup
-  var lookfrom = vec3(uniforms[6], uniforms[7], uniforms[8]);
-  var lookat = vec3(uniforms[9], uniforms[10], uniforms[11]);
-  var camera = set_camera(lookfrom, lookat, 0.0);
-  var ro = lookfrom;
+    // Camera setup
+    var lookfrom = vec3f(uniforms[6], uniforms[7], uniforms[8]);
+    var lookat = vec3f(uniforms[9], uniforms[10], uniforms[11]);
+    var camera = set_camera(lookfrom, lookat, 0.0);
+    var ro = lookfrom;
 
-  // get ray direction
-  var uv = (fragCoord - 0.5 * rez) / rez.y;
-  uv.y = -uv.y;
-  var rd = camera * normalize(vec3(uv, 1.0));
+    // Get ray direction
+    var uv = (fragCoord - 0.5 * rez) / rez.y;
+    uv.y = -uv.y;
+    var rd = camera * normalize(vec3f(uv, 1.0));
 
-  // call march function and get the color/depth
-  let m_out = march(ro,rd);
-  let m_color = m_out.color;
-  let depth= m_out.depth;
+    // Call march function and get the color/depth
+    let m_out = march(ro, rd);
+    let depth = m_out.depth;
 
-  // move ray based on the depth
-  var p = ro + rd*depth;
-  // get light
-  // var color = vec3f(1.0);
-  var color = get_light(p, m_color, rd);
-  
-  // display the result
-  color = linear_to_gamma(color);
-  fb[mapfb(id.xy, uniforms[1])] = vec4(color, 1.0);
+    var color: vec3f;
+    if (depth < MAX_DIST)
+    {
+        // Ray hit an object
+        var p = ro + rd * depth;
+        color = get_light(p, m_out.color, rd);
+    }
+    else
+    {
+        // Ray missed all objects, use background color
+        var light_position = vec3f(uniforms[13], uniforms[14], uniforms[15]);
+        var sun_color = int_to_rgb(i32(uniforms[16]));
+        color = get_ambient_light(light_position, sun_color, rd);
+    }
+
+    // Display the result
+    color = linear_to_gamma(color);
+    fb[mapfb(id.xy, uniforms[1])] = vec4f(color, 1.0);
 }
