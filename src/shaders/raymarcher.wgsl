@@ -107,7 +107,7 @@ fn scene(p: vec3f) -> vec4f // xyz = color, w = distance
       // x: shape type (0: sphere, 1: box, 2: torus)
       // y: shape index
       let quat_ = quaternion_from_euler(shape_.rotation.xyz);
-      let p = p+shape_.transform.xyz;
+      let p = p - shape_.transform.xyz;
 
       if ( stype_ > 1.0) // torus
       { 
@@ -176,14 +176,46 @@ fn march(ro: vec3f, rd: vec3f) -> march_output
 
 fn get_normal(p: vec3f) -> vec3f
 {
-  return vec3f(0.0);
+    var eps = 0.0001;
+    var h = vec2f(eps, 0.0);
+    return normalize(vec3f(
+        scene(p + h.xyy).w - scene(p - h.xyy).w,
+        scene(p + h.yxy).w - scene(p - h.yxy).w,
+        scene(p + h.yyx).w - scene(p - h.yyx).w
+    ));
 }
 
 // https://iquilezles.org/articles/rmshadows/
 fn get_soft_shadow(ro: vec3f, rd: vec3f, tmin: f32, tmax: f32, k: f32) -> f32
 {
-  return 0.0;
+    var res = 1.0;
+    var t = tmin;
+    let max_steps = 100;
+    var eps = 0.0001;
+
+    for (var i = 0; i < max_steps && t < tmax; i = i + 1)
+    {
+        let p = ro + rd * t;
+        let h = scene(p).w;
+
+        if (h < eps)
+        {
+            return 0.0; // In shadow
+        }
+
+        // Update shadow attenuation
+        res = min(res, k * h / t);
+
+        // Advance t
+        t += h;
+    }
+
+    return clamp(res, 0.0, 1.0);
 }
+
+
+
+
 
 fn get_AO(current: vec3f, normal: vec3f) -> f32
 {
@@ -219,26 +251,62 @@ fn get_ambient_light(light_pos: vec3f, sun_color: vec3f, rd: vec3f) -> vec3f
 
 fn get_light(current: vec3f, obj_color: vec3f, rd: vec3f) -> vec3f
 {
-  var light_position = vec3f(uniforms[13], uniforms[14], uniforms[15]);
-  var sun_color = int_to_rgb(i32(uniforms[16]));
-  var ambient = get_ambient_light(light_position, sun_color, rd);
-  var normal = get_normal(current);
+    var eps = 0.0001;
+    // Retrieve light properties from uniforms
+    var light_position = vec3f(uniforms[13], uniforms[14], uniforms[15]);
+    var sun_color = int_to_rgb(i32(uniforms[16]));
+    var ambient_light = get_ambient_light(light_position, sun_color, rd);
 
-  // calculate light based on the normal
-  // if the object is too far away from the light source, return ambient light
-  if (length(current) > uniforms[20] + uniforms[8])
-  {
-    return ambient;
-  }
+    // Compute the normal at the current point
+    var normal = get_normal(current);
 
-  // calculate the light intensity
-  // Use:
-  // - shadow
-  // - ambient occlusion (optional)
-  // - ambient light
-  // - object color
-  return ambient;
+    // Optional: Early exit if the point is too far from the light source
+    var max_light_distance = uniforms[20] + uniforms[8];
+    if (length(current - light_position) > max_light_distance)
+    {
+        return ambient_light * obj_color;
+    }
+
+    // Compute the direction to the light source
+    var light_dir = normalize(light_position - current);
+
+    // Compute diffuse shading (Lambertian reflection)
+    var diff_intensity = max(dot(normal, light_dir), 0.0);
+    var diffuse = diff_intensity * obj_color * sun_color;
+
+    // Compute specular shading (Phong reflection model)
+    var view_dir = normalize(-rd); // Direction from the point to the camera
+    var reflect_dir = reflect(-light_dir, normal);
+    var shininess = 32.0; // Adjust shininess as needed
+    var spec_intensity = pow(max(dot(view_dir, reflect_dir), 0.0), shininess);
+    var specular = spec_intensity * sun_color;
+
+    // Compute shadow factor using soft shadows
+    var shadow = get_soft_shadow(
+        current + normal * eps, // Offset to prevent self-shadowing
+        light_dir,
+        eps, // Start just beyond the surface
+        length(light_position - current), // Max distance to light
+        32.0 // 'k' value controlling shadow softness
+    );
+
+    // Apply shadow to diffuse and specular components
+    diffuse *= shadow;
+    specular *= shadow;
+
+    // Optional: Compute ambient occlusion
+    var ao = get_AO(current, normal);
+
+    // Combine all components
+    var color = ambient_light * obj_color; // Ambient component
+    color += diffuse;                      // Add diffuse component
+    color += specular;                     // Add specular component
+    color *= ao;                           // Apply ambient occlusion
+    color = clamp(color, vec3f(0.0), vec3f(1.0)); // Clamp color to valid range
+
+    return color;
 }
+
 
 fn set_camera(ro: vec3f, ta: vec3f, cr: f32) -> mat3x3<f32>
 {
@@ -300,7 +368,7 @@ fn render(@builtin(global_invocation_id) id : vec3u)
   var p = ro + rd*depth;
   // get light
   // var color = vec3f(1.0);
-  var color = m_color;
+  var color = get_light(p, m_color, rd);
   
   // display the result
   color = linear_to_gamma(color);
