@@ -102,6 +102,9 @@ fn scene(p: vec3f) -> vec4f // xyz = color, w = distance
     var all_objects_count = spheresCount + boxesCount + torusCount;
     var result = vec4f(vec3f(1.0), d);
 
+    var c1 : vec3f;
+    var c2 : vec3f;
+    var count = 0;
     for (var i = 0; i < all_objects_count; i = i + 1)
     {
       // get shape and shape order (shapesinfo)
@@ -127,11 +130,23 @@ fn scene(p: vec3f) -> vec4f // xyz = color, w = distance
       {
         d = sdf_sphere(p,shape_.radius,quat_);
       }
+
+      let op_type = shape_.op.x;
+      let k = shape_.op.y;
+      let d1 = d;
+      let d2 = result.w;
+
+      let c1 = shape_.color.xyz;
+      let c2 = result.xyz;
       
-      if (d < result.w) // if closest object 
+      let op_res = op(op_type,d1,d2,c1,c2,k);
+
+      let op_col = op_res.xyz;
+      let op_d = op_res.w;
+
+      if (op_d < result.w) // return smallest distance
       {
-        result.w = d; // assign closest distance
-        let res = vec4f(shape_.color.xyz,d);
+        let res = vec4f(op_col,op_d);
         result = res; // assign color and distance 
       }
 
@@ -141,17 +156,18 @@ fn scene(p: vec3f) -> vec4f // xyz = color, w = distance
       // call transform_p and the sdf for the shape
       // call op function with the shape operation
 
+    }
+
       // op format:
       // x: operation (0: union, 1: subtraction, 2: intersection)
-      var op_type = shape_.op.x;
-      var op_k = shape_.op.y;
-      var rep = shape_.op.z;
-      var rep_offset = shape_.op.w;
+      // var op_type = shape_.op.x;
+      // var op_k = shape_.op.y;
+      // var rep = shape_.op.z;
+      // var rep_offset = shape_.op.w;
 
       // y: k value
       // z: repeat mode (0: normal, 1: repeat)
       // w: repeat offset
-    }
     return result;
 }
 
