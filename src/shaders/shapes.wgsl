@@ -17,12 +17,6 @@ fn sdf_torus(p: vec3f, t: vec2f, quat: vec4f) -> f32
   return length(q)-t.y;
 }
 
-// float sdTorus( vec3 p, vec2 t )
-// {
-//   vec2 q = vec2(length(p.xz)-t.x,p.y);
-//   return length(q)-t.y;
-// }
-
 fn sdf_mandelbulb(p: vec3f) -> vec2f
 {
   var w = p;

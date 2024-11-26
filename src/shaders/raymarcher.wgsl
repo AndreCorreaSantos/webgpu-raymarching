@@ -94,6 +94,9 @@ fn transform_p(p: vec3f, option: vec2f) -> vec3f
 
 fn scene(p: vec3f) -> vec4f // xyz = color, w = distance
 {
+
+    var mandelbulb = uniforms[18];
+    var weird_thing = uniforms[19];
     var d = mix(100.0, p.y, uniforms[17]);
 
     var spheresCount = i32(uniforms[2]);
@@ -120,7 +123,7 @@ fn scene(p: vec3f) -> vec4f // xyz = color, w = distance
 
       let p_local = transform_p( p - shape_.transform_animated.xyz,shape_.op.zw);
 
-      if ( stype_ > 1.0) // torus
+      if ( stype_ > 1.0 ) // torus
       { 
         d = sdf_torus(p_local,shape_.radius.xy,quat_); 
       }
@@ -143,7 +146,18 @@ fn scene(p: vec3f) -> vec4f // xyz = color, w = distance
       
       result = op(op_type,d1,d2,c1,c2,k);
     }
-
+    if (mandelbulb > 0.0)
+    {
+      var d = sdf_mandelbulb(p);
+      var col = vec3f(1.0);
+      result = vec4f(col,d.x);
+    }
+    if (weird_thing>0.0)
+    {
+      var d = sdf_weird_thing(p,1.0);
+      var col = vec3f(1.0);
+      result = vec4f(col,d);
+    }
     return result;
 }
 
