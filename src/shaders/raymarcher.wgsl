@@ -67,7 +67,7 @@ fn op(op: f32, d1: f32, d2: f32, col1: vec3f, col2: vec3f, k: f32) -> vec4f
   // subtraction
   if (op < 2.0)
   {
-    return op_smooth_subtraction(d2, d1, col2, col1, k);
+    return op_smooth_subtraction(d1, d2, col1, col2, k);
   }
 
   // intersection
@@ -76,7 +76,8 @@ fn op(op: f32, d1: f32, d2: f32, col1: vec3f, col2: vec3f, k: f32) -> vec4f
 
 fn repeat(p: vec3f, offset: vec3f) -> vec3f
 {
-  return vec3f(0.0);
+
+  return modc(p+offset*0.5,offset)-offset*0.5;
 }
 
 fn transform_p(p: vec3f, option: vec2f) -> vec3f
@@ -116,7 +117,8 @@ fn scene(p: vec3f) -> vec4f // xyz = color, w = distance
       // x: shape type (0: sphere, 1: box, 2: torus)
       // y: shape index
       let quat_ =  shape_.quat;
-      let p_local =  p - shape_.transform_animated.xyz;
+
+      let p_local = transform_p( p - shape_.transform_animated.xyz,shape_.op.zw);
 
       if ( stype_ > 1.0) // torus
       { 
@@ -139,17 +141,17 @@ fn scene(p: vec3f) -> vec4f // xyz = color, w = distance
       let c1 = shape_.color.xyz;
       let c2 = result.xyz;
       
-      let op_res = op(op_type,d1,d2,c1,c2,k);
+      result = op(op_type,d1,d2,c1,c2,k);
 
-      let op_col = op_res.xyz;
-      let op_d = op_res.w;
+      // let op_col = op_res.xyz;
+      // let op_d = op_res.w;
 
-      if (op_d < result.w) // return smallest distance
-      {
-        let res = vec4f(op_col,op_d);
-        result = res; // assign color and distance 
-      }
-
+      // if (op_d < result.w) // return smallest distance
+      // {
+      //   let res = vec4f(op_col,op_d);
+      //   result = res; // assign color and distance 
+      // }
+      
 
 
     }
