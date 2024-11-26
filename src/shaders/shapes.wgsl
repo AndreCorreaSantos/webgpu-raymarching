@@ -63,3 +63,40 @@ fn sdf_weird_thing(p_: vec3f, s: f32) -> f32
 
   return 0.3 * abs(p.y) / scale;
 }
+
+fn sdBox(p: vec3<f32>, b: vec3<f32>) -> f32 {
+    let q = abs(p) - b;
+    return length(max(q, vec3<f32>(0.0))) + min(max(q.x, max(q.y, q.z)), 0.0);
+}
+
+fn sdf_menger(p: vec3<f32>, time:f32) -> vec4<f32> {
+    var slider = (2.0+sin(time*0.5))/2.0;
+    var d = sdBox(p, vec3<f32>(slider*2.0)); 
+    var color = vec3<f32>(0.1, 0.4, 1.0); // Initialize color (white by default)
+
+    var s =1.0; // Scale factor
+    for (var m = 0; m < 5; m++) { // Iterate 3 times
+        let a = modc(p * s, vec3<f32>(2.0)) - vec3<f32>(1.0);
+
+        s *= 3.0; // Increase scale
+
+        let r = abs(1.0 - 3.0 * abs(a)); // Calculate distances to cross segments
+
+        let da = max(r.x, r.y);
+        let db = max(r.y, r.z);
+        let dc = max(r.z, r.x);
+        let c = (min(da, min(db, dc)) - 1.0) / s; // Compute fractal's distance function
+
+        // Update the distance and color if closer
+        if (c > d) {
+            d = c;
+            color = vec3<f32>(
+                0.2 * da * db * dc, // Fake occlusion
+                (1.0 + f32(m)) / 4.0, // Encodes iteration level in green
+                1.0 // Static blue channel
+            );
+        }
+    }
+
+    return vec4<f32>(color, d); // Return color in xyz and distance in w
+}

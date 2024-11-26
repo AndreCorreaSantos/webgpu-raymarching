@@ -109,50 +109,59 @@ fn scene(p: vec3f) -> vec4f // xyz = color, w = distance
     var c1 : vec3f;
     var c2 : vec3f;
     var count = 0;
-    for (var i = 0; i < all_objects_count; i = i + 1)
-    {
-      // get shape and shape order (shapesinfo)
-      var info_ = shapesinfob[i];
-      let index_ = i32(info_.y);
-      let stype_ = info_.x; 
-      var shape_ = shapesb[index_];
-      // shapesinfo has the following format:
-      // x: shape type (0: sphere, 1: box, 2: torus)
-      // y: shape index
-      let quat_ =  shape_.quat;
-
-      let p_local = transform_p( p - shape_.transform_animated.xyz,shape_.op.zw);
-
-      if ( stype_ > 1.0 ) // torus
-      { 
-        d = sdf_torus(p_local,shape_.radius.xy,quat_); 
-      }
-      else if (stype_ > 0.0)// box
+    if (all_objects_count > 0){
+      for (var i = 0; i < all_objects_count; i = i + 1)
       {
-        d = sdf_round_box(p_local, shape_.radius.xyz, shape_.radius.w, quat_);
-      } 
-      else  // sphere
-      {
-        d = sdf_sphere(p_local,shape_.radius,quat_);
+        // get shape and shape order (shapesinfo)
+        var info_ = shapesinfob[i];
+        let index_ = i32(info_.y);
+        let stype_ = info_.x; 
+        var shape_ = shapesb[index_];
+        // shapesinfo has the following format:
+        // x: shape type (0: sphere, 1: box, 2: torus)
+        // y: shape index
+        let quat_ =  shape_.quat;
+
+        let p_local = transform_p( p - shape_.transform_animated.xyz,shape_.op.zw);
+
+        if ( stype_ > 1.0 ) // torus
+        { 
+          d = sdf_torus(p_local,shape_.radius.xy,quat_); 
+        }
+        else if (stype_ > 0.0)// box
+        {
+          d = sdf_round_box(p_local, shape_.radius.xyz, shape_.radius.w, quat_);
+        } 
+        else  // sphere
+        {
+          d = sdf_sphere(p_local,shape_.radius,quat_);
+        }
+
+        let op_type = shape_.op.x;
+        let k = shape_.op.y;
+        let d1 = d;
+        let d2 = result.w;
+
+        let c1 = shape_.color.xyz;
+        let c2 = result.xyz;
+        
+        result = op(op_type,d1,d2,c1,c2,k);
       }
-
-      let op_type = shape_.op.x;
-      let k = shape_.op.y;
-      let d1 = d;
-      let d2 = result.w;
-
-      let c1 = shape_.color.xyz;
-      let c2 = result.xyz;
-      
-      result = op(op_type,d1,d2,c1,c2,k);
     }
-    if (mandelbulb > 0.0)
+    else if (mandelbulb > 0.0 && weird_thing > 0.0)
+    {
+      var time = uniforms[0];
+      let new_p = repeat(p,vec3f(10.0));
+
+      result = sdf_menger(new_p,time);
+    }
+    else if (mandelbulb > 0.0)
     {
       var d = sdf_mandelbulb(p);
       var col = vec3f(1.0);
       result = vec4f(col,d.x);
     }
-    if (weird_thing>0.0)
+    else
     {
       var d = sdf_weird_thing(p,1.0);
       var col = vec3f(1.0);
