@@ -142,35 +142,18 @@ fn scene(p: vec3f) -> vec4f // xyz = color, w = distance
       let c2 = result.xyz;
       
       result = op(op_type,d1,d2,c1,c2,k);
-
-      // let op_col = op_res.xyz;
-      // let op_d = op_res.w;
-
-      // if (op_d < result.w) // return smallest distance
-      // {
-      //   let res = vec4f(op_col,op_d);
-      //   result = res; // assign color and distance 
-      // }
-      
-
-
     }
 
-      // op format:
-      // x: operation (0: union, 1: subtraction, 2: intersection)
-      // var op_type = shape_.op.x;
-      // var op_k = shape_.op.y;
-      // var rep = shape_.op.z;
-      // var rep_offset = shape_.op.w;
-
-      // y: k value
-      // z: repeat mode (0: normal, 1: repeat)
-      // w: repeat offset
     return result;
 }
 
 fn march(ro: vec3f, rd: vec3f) -> march_output
 {
+    // outlinePostProcess: 0, // 26
+    // outlineWidth: 0.05, // 27
+    // outlineColor: 0.0, // 28
+  var outline = uniforms[26];
+  var outline_width = uniforms[27];
   var max_marching_steps = i32(uniforms[5]);
   var EPSILON = uniforms[23];
 
@@ -178,24 +161,35 @@ fn march(ro: vec3f, rd: vec3f) -> march_output
   var color = vec3f(0.0);
   var distance = 10000;
   var march_step = uniforms[22];
-  
+  var min_dist = MAX_DIST;
   for (var i = 0; i < max_marching_steps; i = i + 1)
   {
       // raymarch algorithm
       let p = ro+rd*depth;
-      // call scene function and march
+
       let res = scene(p);
       let distance = res.w;
       color = res.xyz;
-      // how to determine color
-      // if the depth is greater than the max distance or the distance is less than the epsilon, break
-      if (depth > MAX_DIST || distance < EPSILON)
+
+      if (res.w < min_dist)
+      {
+        min_dist = res.w;
+      }
+
+      if(depth > MAX_DIST)
+      {
+        break;
+      }
+
+      if (distance < EPSILON) 
       {
         return march_output(color,depth,false);
       }
       depth += distance;
   }
-  return march_output(vec3f(0.0), MAX_DIST, false);
+  var out_ = outline > 0 && min_dist < outline_width;
+
+  return march_output(vec3f(0.0), MAX_DIST, out_);
   
 }
 
@@ -371,6 +365,7 @@ fn render(@builtin(global_invocation_id) id: vec3u)
     var fragCoord = vec2f(f32(id.x), f32(id.y));
     var rez = vec2f(uniforms[1]);
     var time = uniforms[0];
+    var outline_color = uniforms[28];
 
     // Camera setup
     var lookfrom = vec3f(uniforms[6], uniforms[7], uniforms[8]);
@@ -400,6 +395,11 @@ fn render(@builtin(global_invocation_id) id: vec3u)
         var light_position = vec3f(uniforms[13], uniforms[14], uniforms[15]);
         var sun_color = int_to_rgb(i32(uniforms[16]));
         color = get_ambient_light(light_position, sun_color, rd);
+    }
+
+    if(m_out.outline)
+    {
+      color = vec3f(1.0)*outline_color;
     }
 
     // Display the result
