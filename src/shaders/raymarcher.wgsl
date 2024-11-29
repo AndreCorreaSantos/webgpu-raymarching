@@ -130,7 +130,7 @@ fn scene(p: vec3f) -> vec4f // xyz = color, w = distance
         }
         else if (stype_ > 0.0)// box
         {
-          d = sdf_round_box(p_local, shape_.radius.xyz, shape_.radius.w, quat_);
+          d = sdf_round_box(p_local, shape_.radius.xyz+ shape_.radius.w, shape_.radius.w, quat_);
         } 
         else  // sphere
         {
@@ -185,7 +185,7 @@ fn march(ro: vec3f, rd: vec3f) -> march_output
   var distance = 10000;
   var march_step = uniforms[22];
   var min_dist = MAX_DIST;
-  for (var i = 0; i < max_marching_steps; i = i + 1)
+  for (var i = 0; i < max_marching_steps*2; i = i + 1)
   {
       // raymarch algorithm
       let p = ro+rd*depth;
